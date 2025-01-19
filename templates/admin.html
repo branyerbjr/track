@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center">Admin Panel</h1>
+        <div class="my-4 text-center">
+            <button class="btn btn-primary" onclick="generateUrl()">Generate New Tracking URL</button>
+        </div>
+        <div id="output" class="alert alert-info d-none"></div>
+        <table class="table table-bordered mt-4">
+            <thead>
+                <tr>
+                    <th>Person ID</th>
+                    <th>Tracking URL</th>
+                    <th>City</th>
+                    <th>Region</th>
+                    <th>Country</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>Last Accessed</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for link in links %}
+                <tr>
+                    <td>{{ link[0] }}</td>
+                    <td><a href="{{ link[1] }}" target="_blank">{{ link[1] }}</a></td>
+                    <td>{{ link[2] or 'N/A' }}</td>
+                    <td>{{ link[3] or 'N/A' }}</td>
+                    <td>{{ link[4] or 'N/A' }}</td>
+                    <td>{{ link[5] or 'N/A' }}</td>
+                    <td>{{ link[6] or 'N/A' }}</td>
+                    <td>{{ link[7] or 'Never' }}</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" onclick="showMap({{ link[5] }}, {{ link[6] }})">View Map</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal for Map -->
+    <div class="modal fade" id="mapModal" tabindex="-1" aria-labelledby="mapModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mapModalLabel">Location Map</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="map"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+    <script>
+        let map, marker;
+
+        // Inicializar el mapa
+        function initializeMap() {
+            if (!map) {
+                map = L.map('map').setView([0, 0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                marker = L.marker([0, 0]).addTo(map);
+            }
+        }
+
+        // Mostrar el mapa en el modal
+        function showMap(lat, lng) {
+            initializeMap();
+            const modal = new bootstrap.Modal(document.getElementById('mapModal'));
+            modal.show();
+
+            // Forzar el redibujo del mapa después de mostrar el modal
+            modal._element.addEventListener('shown.bs.modal', () => {
+                map.invalidateSize(); // Redibujar el mapa
+                map.setView([lat, lng], 13); // Centrar el mapa
+                marker.setLatLng([lat, lng]); // Mover el marcador
+            });
+        }
+
+        // Generar un nuevo enlace de rastreo
+        function generateUrl() {
+            fetch('/generate', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    const output = document.getElementById('output');
+                    output.classList.remove('d-none');
+                    output.textContent = `Tracking URL Generated: ${data.tracking_url}`;
+
+                    // Emitir evento para agregar el enlace en tiempo real
+                    socket.emit('new_link', {
+                        person_id: data.person_id,
+                        tracking_url: data.tracking_url
+                    });
+                })
+                .catch(err => {
+                    console.error('Error generating URL:', err);
+                    alert('Failed to generate URL. Please try again.');
+                });
+        }
+
+        // Escuchar evento de nuevo enlace generado desde el servidor
+        socket.on('new_link', (data) => {
+            const tableBody = document.querySelector('table tbody');
+            const newRow = `
+                <tr>
+                    <td>${data.person_id}</td>
+                    <td><a href="${data.tracking_url}" target="_blank">${data.tracking_url}</a></td>
+                    <td>N/A</td>
+                    <td>N/A</td>
+                    <td>N/A</td>
+                    <td>N/A</td>
+                    <td>N/A</td>
+                    <td>Never</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" onclick="showMap(0, 0)">View Map</button>
+                    </td>
+                </tr>
+            `;
+            tableBody.insertAdjacentHTML('afterbegin', newRow);
+        });
+
+        // Escuchar evento de actualización de ubicación
+        socket.on('location_update', (data) => {
+            const rows = document.querySelectorAll('table tbody tr');
+            rows.forEach(row => {
+                const personIdCell = row.children[0];
+                if (personIdCell.textContent === data.person_id) {
+                    row.children[2].textContent = data.city || 'N/A';
+                    row.children[3].textContent = data.region || 'N/A';
+                    row.children[4].textContent = data.country || 'N/A';
+                    row.children[5].textContent = data.latitude || 'N/A';
+                    row.children[6].textContent = data.longitude || 'N/A';
+                    row.children[7].textContent = new Date().toLocaleString();
+                    row.children[8].innerHTML = `
+                        <button class="btn btn-info btn-sm" onclick="showMap(${data.latitude}, ${data.longitude})">View Map</button>
+                    `;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
