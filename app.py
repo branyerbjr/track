@@ -43,6 +43,12 @@ def init_db():
 
 init_db()
 
+# Obtener la IP real del cliente detrás de un proxy
+def get_client_ip():
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0]
+    return request.remote_addr
+
 @app.route('/admin')
 def admin_panel():
     with sqlite3.connect(DB_PATH) as conn:
@@ -60,7 +66,7 @@ def admin_panel():
 @app.route('/generate', methods=['POST'])
 def generate_url():
     person_id = str(uuid.uuid4())
-    tracking_url = f"http://127.0.0.1:5000/track/{person_id}"
+    tracking_url = f"https://your-domain.com/track/{person_id}"
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -91,7 +97,7 @@ def track(person_id):
         return jsonify({"method": "gps", "location": gps_location})
 
     # Rastrear por IP usando la base de datos GeoLite2
-    ip_address = data.get('ip', request.remote_addr)  # IP enviada o la IP del cliente
+    ip_address = get_client_ip()
     try:
         with geoip2.database.Reader(GEOIP_DB_PATH) as reader:
             response = reader.city(ip_address)
