@@ -25,9 +25,6 @@
                 <tr>
                     <th>Person ID</th>
                     <th>Tracking URL</th>
-                    <th>City</th>
-                    <th>Region</th>
-                    <th>Country</th>
                     <th>Latitude</th>
                     <th>Longitude</th>
                     <th>Last Accessed</th>
@@ -41,12 +38,9 @@
                     <td><a href="{{ link[1] }}" target="_blank">{{ link[1] }}</a></td>
                     <td>{{ link[2] or 'N/A' }}</td>
                     <td>{{ link[3] or 'N/A' }}</td>
-                    <td>{{ link[4] or 'N/A' }}</td>
-                    <td>{{ link[5] or 'N/A' }}</td>
-                    <td>{{ link[6] or 'N/A' }}</td>
-                    <td>{{ link[7] or 'Never' }}</td>
+                    <td>{{ link[4] or 'Never' }}</td>
                     <td>
-                        <button class="btn btn-info btn-sm" onclick="showMap({{ link[5] }}, {{ link[6] }})">View Map</button>
+                        <button class="btn btn-info btn-sm" onclick="showMap({{ link[2] }}, {{ link[3] }})">View Map</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -133,9 +127,6 @@
                     <td><a href="${data.tracking_url}" target="_blank">${data.tracking_url}</a></td>
                     <td>N/A</td>
                     <td>N/A</td>
-                    <td>N/A</td>
-                    <td>N/A</td>
-                    <td>N/A</td>
                     <td>Never</td>
                     <td>
                         <button class="btn btn-info btn-sm" onclick="showMap(0, 0)">View Map</button>
@@ -151,13 +142,10 @@
             rows.forEach(row => {
                 const personIdCell = row.children[0];
                 if (personIdCell.textContent === data.person_id) {
-                    row.children[2].textContent = data.city || 'N/A';
-                    row.children[3].textContent = data.region || 'N/A';
-                    row.children[4].textContent = data.country || 'N/A';
-                    row.children[5].textContent = data.latitude || 'N/A';
-                    row.children[6].textContent = data.longitude || 'N/A';
-                    row.children[7].textContent = new Date().toLocaleString();
-                    row.children[8].innerHTML = `
+                    row.children[2].textContent = data.latitude || 'N/A';
+                    row.children[3].textContent = data.longitude || 'N/A';
+                    row.children[4].textContent = new Date().toLocaleString();
+                    row.children[5].innerHTML = `
                         <button class="btn btn-info btn-sm" onclick="showMap(${data.latitude}, ${data.longitude})">View Map</button>
                     `;
                 }
